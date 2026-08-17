@@ -4,11 +4,16 @@
     window.__aabSponsorBlockInstalled = true;
 
     var API = 'https://sponsor.ajay.app/api/skipSegments';
-    var CATEGORIES = ['sponsor', 'selfpromo', 'interaction'];
+    var CATEGORIES = ['sponsor', 'selfpromo', 'interaction', 'intro', 'outro', 'preview', 'filler', 'music_offtopic'];
     var LABELS = {
         sponsor: 'Skip sponsor',
         selfpromo: 'Skip self-promo',
-        interaction: 'Skip reminder'
+        interaction: 'Skip reminder',
+        intro: 'Skip intro',
+        outro: 'Skip outro',
+        preview: 'Skip preview',
+        filler: 'Skip filler',
+        music_offtopic: 'Skip non-music'
     };
 
     var state = { videoId: null, segments: [], active: null, button: null };
