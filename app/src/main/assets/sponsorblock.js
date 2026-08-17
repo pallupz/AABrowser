@@ -1,0 +1,95 @@
+(function () {
+    'use strict';
+    if (window.__aabSponsorBlockInstalled) return;
+    window.__aabSponsorBlockInstalled = true;
+
+    var API = 'https://sponsor.ajay.app/api/skipSegments';
+    var CATEGORIES = ['sponsor', 'selfpromo', 'interaction'];
+    var LABELS = {
+        sponsor: 'Skip sponsor',
+        selfpromo: 'Skip self-promo',
+        interaction: 'Skip reminder'
+    };
+
+    var state = { videoId: null, segments: [], active: null, button: null };
+    window.__aabSB = state; // debug handle
+
+    function getVideoId() {
+        try {
+            var m = location.search.match(/[?&]v=([\w-]{5,})/);
+            if (m) return m[1];
+            var p = location.pathname.match(/\/(?:shorts|embed)\/([\w-]{5,})/);
+            return p ? p[1] : null;
+        } catch (e) { return null; }
+    }
+
+    function fetchSegments(videoId) {
+        var url = API + '?videoID=' + encodeURIComponent(videoId) +
+            '&categories=' + encodeURIComponent(JSON.stringify(CATEGORIES));
+        fetch(url)
+            .then(function (r) { return r.status === 200 ? r.json() : []; })
+            .then(function (list) {
+                if (state.videoId === videoId && Array.isArray(list)) state.segments = list;
+            })
+            .catch(function () { /* offline or blocked: no button, nothing broken */ });
+    }
+
+    function ensureButton(player) {
+        var btn = state.button;
+        if (btn && btn.parentNode === player) return btn;
+        if (btn && btn.parentNode) btn.parentNode.removeChild(btn);
+        btn = document.createElement('button');
+        btn.id = 'aab-sb-skip';
+        btn.style.cssText =
+            'position:absolute;right:16px;bottom:80px;z-index:2147483647;display:none;' +
+            'padding:14px 22px;font-size:18px;font-weight:600;color:#fff;cursor:pointer;' +
+            'background:rgba(0,0,0,0.75);border:2px solid #fff;border-radius:28px;';
+        btn.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            ev.preventDefault();
+            var video = player.querySelector('video');
+            if (video && state.active) video.currentTime = state.active.segment[1] + 0.01;
+            btn.style.display = 'none';
+            state.active = null;
+        }, true);
+        player.appendChild(btn);
+        state.button = btn;
+        return btn;
+    }
+
+    setInterval(function () {
+        try {
+            var vid = getVideoId();
+            if (vid !== state.videoId) {
+                state.videoId = vid;
+                state.segments = [];
+                state.active = null;
+                if (state.button) state.button.style.display = 'none';
+                if (vid) fetchSegments(vid);
+            }
+            if (!state.segments.length) return;
+
+            var player = document.querySelector('.html5-video-player');
+            var video = player && player.querySelector('video');
+            if (!player || !video) return;
+
+            var btn = ensureButton(player);
+            var t = video.currentTime;
+            var found = null;
+            for (var i = 0; i < state.segments.length; i++) {
+                var s = state.segments[i].segment;
+                if (t >= s[0] && t < s[1] - 0.3) { found = state.segments[i]; break; }
+            }
+            if (found) {
+                if (state.active !== found) {
+                    state.active = found;
+                    btn.textContent = (LABELS[found.category] || 'Skip segment') + ' »';
+                }
+                btn.style.display = 'block';
+            } else {
+                state.active = null;
+                btn.style.display = 'none';
+            }
+        } catch (e) { /* keep the watchdog alive */ }
+    }, 500);
+})();

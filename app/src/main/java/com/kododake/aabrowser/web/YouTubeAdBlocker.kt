@@ -4,10 +4,11 @@ import android.content.Context
 import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import java.util.concurrent.ConcurrentHashMap
 
 object YouTubeAdBlocker {
 
-    private const val SCRIPT_ASSET = "youtube_adblock.js"
+    private val SCRIPT_ASSETS = listOf("youtube_adblock.js", "sponsorblock.js")
 
     private val ALLOWED_ORIGINS = setOf(
         "https://youtube.com",
@@ -17,17 +18,19 @@ object YouTubeAdBlocker {
         "https://www.youtube-nocookie.com"
     )
 
-    @Volatile
-    private var cachedScript: String? = null
+    private val scriptCache = ConcurrentHashMap<String, String>()
 
     fun install(webView: WebView) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
-        val script = loadScript(webView.context) ?: return
-        WebViewCompat.addDocumentStartJavaScript(webView, script, ALLOWED_ORIGINS)
+        SCRIPT_ASSETS.forEach { asset ->
+            loadScript(webView.context, asset)?.let { script ->
+                WebViewCompat.addDocumentStartJavaScript(webView, script, ALLOWED_ORIGINS)
+            }
+        }
     }
 
-    private fun loadScript(context: Context): String? =
-        cachedScript ?: runCatching {
-            context.assets.open(SCRIPT_ASSET).bufferedReader().use { it.readText() }
-        }.getOrNull()?.also { cachedScript = it }
+    private fun loadScript(context: Context, asset: String): String? =
+        scriptCache[asset] ?: runCatching {
+            context.assets.open(asset).bufferedReader().use { it.readText() }
+        }.getOrNull()?.also { scriptCache[asset] = it }
 }
