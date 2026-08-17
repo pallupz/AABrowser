@@ -39,26 +39,57 @@
             .catch(function () { /* offline or blocked: no button, nothing broken */ });
     }
 
-    function ensureButton(player) {
-        var btn = state.button;
-        if (btn && btn.parentNode === player) return btn;
-        if (btn && btn.parentNode) btn.parentNode.removeChild(btn);
-        btn = document.createElement('button');
-        btn.id = 'aab-sb-skip';
-        btn.style.cssText =
-            'position:absolute;right:16px;bottom:80px;z-index:2147483647;display:none;' +
-            'padding:14px 22px;font-size:18px;font-weight:600;color:#fff;cursor:pointer;' +
-            'background:rgba(0,0,0,0.75);border:2px solid #fff;border-radius:28px;';
-        btn.addEventListener('click', function (ev) {
-            ev.stopPropagation();
+    function doSkip() {
+        var video = document.querySelector('.html5-video-player video') ||
+            document.querySelector('video');
+        if (video && state.active) video.currentTime = state.active.segment[1] + 0.01;
+        if (state.button) state.button.style.display = 'none';
+        state.active = null;
+    }
+
+    function isOurs(el) {
+        return !!(el && el.nodeType === 1 &&
+            (el.id === 'aab-sb-skip' || (el.closest && el.closest('#aab-sb-skip'))));
+    }
+
+    // Registered at document start, so these capture-phase listeners run before
+    // YouTube's own touch handlers (which otherwise toggle the control overlay).
+    ['touchstart', 'touchend', 'click'].forEach(function (type) {
+        window.addEventListener(type, function (ev) {
+            if (!isOurs(ev.target)) return;
             ev.preventDefault();
-            var video = player.querySelector('video');
-            if (video && state.active) video.currentTime = state.active.segment[1] + 0.01;
-            btn.style.display = 'none';
-            state.active = null;
-        }, true);
-        player.appendChild(btn);
-        state.button = btn;
+            ev.stopImmediatePropagation();
+            if (type !== 'touchstart') doSkip();
+        }, { capture: true, passive: false });
+    });
+
+    // The mobile player (#movie_player) has a transform, so it is a stacking
+    // context below the controls overlay host; the button must live in the
+    // host (or the fullscreen element) to be tappable above the overlay.
+    function mountTarget(player) {
+        var fs = document.fullscreenElement;
+        if (fs) {
+            var fsHost = fs.querySelector && fs.querySelector('.ytmWatchPlayerControlsHost');
+            return fsHost || fs;
+        }
+        return document.querySelector('.ytmWatchPlayerControlsHost') || player;
+    }
+
+    function ensureButton(target) {
+        var btn = state.button;
+        if (btn && btn.parentNode === target) return btn;
+        if (btn && btn.parentNode) btn.parentNode.removeChild(btn);
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'aab-sb-skip';
+            btn.style.cssText =
+                'position:absolute;right:16px;bottom:80px;z-index:2147483647;display:none;' +
+                'padding:14px 22px;font-size:18px;font-weight:600;color:#fff;cursor:pointer;' +
+                'background:rgba(0,0,0,0.75);border:2px solid #fff;border-radius:28px;' +
+                'pointer-events:auto;';
+            state.button = btn;
+        }
+        target.appendChild(btn);
         return btn;
     }
 
@@ -78,7 +109,7 @@
             var video = player && player.querySelector('video');
             if (!player || !video) return;
 
-            var btn = ensureButton(player);
+            var btn = ensureButton(mountTarget(player));
             var t = video.currentTime;
             var found = null;
             for (var i = 0; i < state.segments.length; i++) {
