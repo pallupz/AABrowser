@@ -22,6 +22,7 @@ import androidx.core.net.toUri
 import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import com.kododake.aabrowser.BuildConfig
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.model.UserAgentProfile
 
@@ -57,7 +58,7 @@ fun configureWebView(
         isHorizontalScrollBarEnabled = false
         isVerticalScrollBarEnabled = true
 
-        WebView.setWebContentsDebuggingEnabled(false)
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
         val originalUserAgent = settings.userAgentString
         setTag(R.id.webview_original_user_agent_tag, originalUserAgent)
@@ -88,6 +89,8 @@ fun configureWebView(
 
         applyPageDarkening(allowDarkPages)
         applyBrowserIdentity(userAgentProfile, useDesktopMode)
+
+        YouTubeAdBlocker.install(this)
 
         CookieManager.getInstance().also {
             it.setAcceptCookie(true)
